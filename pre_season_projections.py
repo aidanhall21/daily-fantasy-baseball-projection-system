@@ -2,6 +2,7 @@
 
 #####
 ## This file will create baseline projections for each player for the upcoming season
+## You will need the fangraphs_league_stats_1980-2020.csv file and the full_season_data_2020.csv file
 
 import pandas as pd
 import re
@@ -54,7 +55,7 @@ def preseason_projections_hitters(year):
     if year == 2022:
         data2 = pd.read_csv('full_season_data_2020.csv')
 
-    if year = 2023:
+    if year == 2023:
         data3 = pd.read_csv('full_season_data_2020.csv')
 
     ## League statistics imported from file donwloaded directly from Fangraphs
@@ -66,7 +67,7 @@ def preseason_projections_hitters(year):
     ## List of relevant columns
 
     cols1 = ['PA', 'AB', 'R', '1B', '2B', '3B', 'HR', 'RBI', 'BB', 'SO', 'HBP', 'SF', 'SB']
-    cols2 = ['IDfg', 'Name', 'Team', 'Age', 'Season']
+    cols2 = ['IDfg', 'Name', 'Age', 'Season']
     cols3 = ['IDfg', 'Name', 'Season'] + cols1
     player_info_prior_season = data1[cols2].reset_index(drop=True)
 
@@ -79,6 +80,9 @@ def preseason_projections_hitters(year):
     ## Only projecting players who made an appearance in the prior season
     ## ***TODO: Will have to figure out in the future how to remove pitcher's batting stats and vice versa
     ## as well as dealing with players who opted out of the 2020 season
+
+    ## Update: I figured out a way to remove pitcher's but ran into ID issues for newer players
+    ## I will have to keep an eye out for database updates
 
     players_from_prior_season = list(data1.IDfg)
     data2 = data2[data2['IDfg'].isin(players_from_prior_season)]
@@ -198,13 +202,18 @@ def preseason_projections_hitters(year):
     counting_stat_rates = projected_rates_all_players_no_age.iloc[:, 2:]
 
     # Data frame of player info from most recent season in data set
+    ## Ideally AGE should be defined as [upcoming season year] - [year of birth]
+    ## This is getable using the chadwick database, but they currently don't have a complete set of 
+    ## Fangraphs ID's for newer major league players
+    ## Something to keep an ey on
 
-    player_age_df = player_info_prior_season.iloc[:,:4]
+    player_age_df = player_info_prior_season.iloc[:,:3]
     player_age_df['age_factor'] = player_age_df.apply(lambda row: (29 - (row['Age'] + 1)) * 0.006 if (29 - (row['Age'] + 1)) > 0 else (29 - (row['Age'] + 1)) * 0.003, axis=1)
-    player_age_df = player_age_df.set_index(partial_df.columns[0]).drop(['Name', 'Team', 'Age'], axis=1)
+    player_age_df = player_age_df.set_index(partial_df.columns[0]).drop(['Name', 'Age'], axis=1)
 
     player_age_mult_df = pd.concat([player_age_df] * counting_stat_rates.shape[1], axis=1)
     player_age_mult_df = player_age_mult_df + 1
+    player_age_mult_df = player_age_mult_df.sort_index()
 
     age_weighted_rates = pd.DataFrame(counting_stat_rates.values*player_age_mult_df.values, columns=counting_stat_rates.columns, index=counting_stat_rates.index)
     
@@ -264,6 +273,7 @@ def preseason_projections_hitters(year):
 
     ## Convert Draft Kings point projection to a per plate appearance projection
 
+    player_info_prior_season['Age'] += 1
     full_season_projections = pd.merge(player_info_prior_season, season_projections, on='IDfg')
     full_season_projections['Season'] = year
     full_season_projections.to_csv('full_season_projections_' + str(year) + '.csv', index=False)
@@ -274,15 +284,5 @@ def preseason_projections_hitters(year):
     points_per_pa_projection = pd.merge(player_info_prior_season, per_pa_projection, on='IDfg')
     points_per_pa_projection = points_per_pa_projection.rename(columns={'DKp': 'DKp/pa'})
     points_per_pa_projection.to_csv('DK_points_per_pa_proj_' + str(year) + '.csv', index=False)
-
-
-    
-    
-
-    
-
-
-
-
 
 # %%
