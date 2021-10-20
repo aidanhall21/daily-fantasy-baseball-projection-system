@@ -24,8 +24,8 @@ def makeBatTable(r):
         r['DKp'] = 0
         r['DKp/PA'] = 0
     else:
-        pa = float(r['AB']+r['BB']+r['SF']+r['HP']+r['CI'])
-        obp = float(r['H']+r['BB']+r['HP']+r['CI'])/pa
+        pa = float(r['PA'])
+        obp = float(r['H']+r['BB']+r['HP'])/pa
         r['OBP'] = round(obp, 3)
         sing = int(r['H']) - int(r['HR']) - int(r['T']) - int(r['D'])
         num = (.72*int(r['BB'])) + (.75*int(r['HP'])) + (.9*sing) + (1.24*int(r['D'])) + (1.56*int(r['T'])) + (1.95*int(r['HR']))

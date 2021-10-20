@@ -10,10 +10,12 @@ from datetime import datetime
 from statistics import mean
 from pulp import *
 from collections import Counter
+import warnings
+warnings.filterwarnings('ignore')
 
 from projection_file_functions import *
 
-date = '2019-AUG-21'
+date = '2020-SEP-21'
 
 def get_hitter_projections_by_date(date):
 
@@ -54,6 +56,7 @@ def get_hitter_projections_by_date(date):
     sals['pSB/PA'] = sals.apply(lambda row: round(blended_projections_dict[row['PlayerID']]['SB'], 3) if row['PlayerID'] in blended_projections_dict else np.NaN, axis=1)
 
     sals_with_vegas_lines, starting_pitchers = get_vegas_lines(date, sals)
+    sals_with_vegas_lines = adjust_for_park_factors(sals_with_vegas_lines)
 
     batting_order_file = get_batting_orders_file()
 
@@ -134,6 +137,7 @@ def get_pitcher_projections_by_date(date):
     current_year_starts_vs_team = game_logs.loc[game_logs.Started == 1].groupby('OpponentID').TotalOutsPitched.agg(['sum', 'mean', 'std']).fillna(0)
 
     sals_with_vegas_lines, starting_pitchers = get_vegas_lines(date, sals)
+    sals_with_vegas_lines = adjust_for_park_factors_pitchers(sals_with_vegas_lines)
 
     all_starters_projections_dict = generate_starting_pitcher_projections(starting_pitchers, sals_with_vegas_lines, prior_year_ind_pitcher_dist, prior_year_league_innings_dist, current_year_ind_pitcher_dist, current_year_league_innings_dist, current_year_outs, weighted_league_innings_dist_mean, weighted_league_innings_dist_std, current_year_starts_vs_team, FIP_constant)
 
@@ -142,8 +146,10 @@ def get_pitcher_projections_by_date(date):
     print(f'generated pitcher projections for {date}')
     return projection_df
 
-
+#%%
 ### This stuff is all for accuracy testing
+
+slates_list = get_classic_slates_by_date(date)
 
 hitter_projections = get_hitter_projections_by_date(date)
 pitcher_projections = get_pitcher_projections_by_date(date)
@@ -151,8 +157,6 @@ pitcher_projections = get_pitcher_projections_by_date(date)
 hitters_points_and_sal = hitter_projections.loc[:,['PlayerID','SlateID', 'OperatorPlayerName', 'OperatorPosition', 'OperatorSalary','DraftKingsPoints']]
 pitchers_points_and_sal = pitcher_projections.loc[:,['PlayerID', 'SlateID', 'OperatorPlayerName', 'OperatorPosition', 'OperatorSalary','DraftKingsPoints']]
 points_and_sal = pd.concat([hitters_points_and_sal, pitchers_points_and_sal], axis=0)
-
-slates_list = get_classic_slates_by_date(date)
 
 optimals_dict = {}
 
@@ -210,5 +214,98 @@ for slate in slates_list:
 
 
 # %%
+from datetime import date, timedelta, datetime
+import pandas as pd
+
+
+sdate = date(2019,6,1)   # start date
+edate = date(2019,7,11)
+
+test_dates = []
+
+dates = pd.date_range(sdate,edate-timedelta(days=1),freq='d')
+for date in dates:
+    date_time_obj = date.to_pydatetime()
+    date_string = date_time_obj.strftime('%Y-%b-%d').upper()
+    test_dates.append(date_string)
 
 # %%
+
+wins_list = []
+
+for date in test_dates:
+
+    print(date)
+    
+    try:
+        slates_list = get_classic_slates_by_date(date)
+    except: continue
+
+    if len(slates_list) == 0: continue
+
+    hitter_projections = get_hitter_projections_by_date(date)
+    pitcher_projections = get_pitcher_projections_by_date(date)
+
+    hitters_points_and_sal = hitter_projections.loc[:,['PlayerID','SlateID', 'OperatorPlayerName', 'OperatorPosition', 'OperatorSalary','DraftKingsPoints']]
+    pitchers_points_and_sal = pitcher_projections.loc[:,['PlayerID', 'SlateID', 'OperatorPlayerName', 'OperatorPosition', 'OperatorSalary','DraftKingsPoints']]
+    points_and_sal = pd.concat([hitters_points_and_sal, pitchers_points_and_sal], axis=0)
+
+    optimals_dict = {}
+
+    sports_data_projections = get_sportsdata_projections_by_date(date)
+
+    for slate in slates_list:
+
+        try:
+            print(slate)
+            optimal_players, optimal_player_names, total_salary_used, projected_points = dfs_optimizer(slate, points_and_sal,'DraftKingsPoints', [], [])
+            optimals_dict[slate] = {'players': optimal_players, 'names': optimal_player_names, 'salary': total_salary_used, 'proj_points': projected_points}
+            
+            actual_points = get_actual_points_scored_by_lineup(date, optimals_dict[slate]['players'])
+            optimals_dict[slate]['actual_points'] = actual_points
+            
+            actual_optimal_players, actual_optimal_player_names, top_total_salary_used, max_points_scored = get_best_lineup(date, slate, 'FantasyPointsDraftKings', [], [])
+            optimals_dict[slate]['optimal_players'] = actual_optimal_players
+            optimals_dict[slate]['optimal_player_names'] = actual_optimal_player_names
+            optimals_dict[slate]['real_total_sal'] = top_total_salary_used
+            optimals_dict[slate]['max_points_score'] = max_points_scored
+
+            common_player_names = list(set(optimal_player_names) & set(actual_optimal_player_names))
+            common_player_count = [key for key, val in enumerate(optimal_players) if val in set(actual_optimal_players)]
+            num_common_players = len(common_player_count)
+
+            optimals_dict[slate]['common_player_names'] = common_player_names
+            optimals_dict[slate]['num_common_players'] = num_common_players
+
+            sd_optimal_players, sd_optimal_player_names, sd_total_salary_used, sd_projected_points = get_sportsdata_optimal(slate, sports_data_projections, 'FantasyPointsDraftKings', [], [])
+
+            optimals_dict[slate]['sd_optimal_players'] = sd_optimal_players
+            optimals_dict[slate]['sd_optimal_player_names'] = sd_optimal_player_names
+            optimals_dict[slate]['sd_total_sal'] = sd_total_salary_used
+            optimals_dict[slate]['sd_proj_points'] = sd_projected_points
+
+            sd_optimal_actual_points = get_actual_points_scored_by_lineup(date, optimals_dict[slate]['sd_optimal_players'])
+            optimals_dict[slate]['sd_actual_points'] = sd_optimal_actual_points
+            win = 1 if actual_points > sd_optimal_actual_points else 0
+            optimals_dict[slate]['projection_win'] = win
+            diff = abs(actual_points - sd_optimal_actual_points)
+            optimals_dict[slate]['score_dff'] = diff
+
+            sd_common_player_names = list(set(sd_optimal_player_names) & set(optimal_player_names))
+            sd_common_player_count = [key for key, val in enumerate(sd_optimal_players) if val in set(actual_optimal_players)]
+            num_sd_common_players = len(sd_common_player_count)
+            optimals_dict[slate]['sd_common_player_names'] = sd_common_player_names
+            optimals_dict[slate]['sd_num_common_players'] = num_sd_common_players
+
+            print('PL Optimal Score: ' + str(actual_points))
+            print('SD Optimal Score: ' + str(sd_optimal_actual_points))
+            if win == 1:
+                print('WINNER')
+                wins_list.append(1)
+
+            else:
+                print('loser')
+                wins_list.append(0)
+
+        except:
+            print('There was an error')

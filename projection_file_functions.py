@@ -1,3 +1,4 @@
+#%%
 ## Import packages
 
 import pandas as pd
@@ -11,7 +12,9 @@ from datetime import datetime
 from statistics import mean
 from pulp import *
 from collections import Counter
-
+#%%
+# Returns a dataframe of player information and salaries for both DFS sites for that day
+# Returns a list of sportsdata player ids for all players included in a DK or FD slate that day
 def get_batter_salaries(date):
     response = requests.get(f'https://api.sportsdata.io/api/mlb/fantasy/json/DfsSlatesByDate/{date}', headers={'Ocp-Apim-Subscription-Key': '6fcab751d8594ce9909283dcdc522d24'})
     games = response.json()
@@ -25,6 +28,8 @@ def get_batter_salaries(date):
 
     return df_player_sal, players
 
+# Returns a dataframe of pitcher information and salaries for both DFS sites for that day
+# Returns a list of sportsdata player ids for all pitchers included in a DK or FD slate that day
 def get_pitcher_salaries(date):
     response = requests.get(f'https://api.sportsdata.io/api/mlb/fantasy/json/DfsSlatesByDate/{date}', headers={'Ocp-Apim-Subscription-Key': '6fcab751d8594ce9909283dcdc522d24'})
     games = response.json()
@@ -38,6 +43,28 @@ def get_pitcher_salaries(date):
 
     return df_player_sal, players
 
+def adjust_for_park_factors(sals_with_vegas_lines):
+    park_factors = pd.read_csv('ParkFactors.csv')
+    park_adjusted_sals_with_vegas_lines = sals_with_vegas_lines.merge(park_factors, how = 'left', on = ['Game.StadiumID'])
+    park_adjusted_sals_with_vegas_lines['pS/PA'] = park_adjusted_sals_with_vegas_lines['pS/PA'] * park_adjusted_sals_with_vegas_lines['1B'] / 100
+    park_adjusted_sals_with_vegas_lines['pD/PA'] = park_adjusted_sals_with_vegas_lines['pD/PA'] * park_adjusted_sals_with_vegas_lines['2B'] / 100
+    park_adjusted_sals_with_vegas_lines['pT/PA'] = park_adjusted_sals_with_vegas_lines['pT/PA'] * park_adjusted_sals_with_vegas_lines['3B'] / 100
+    park_adjusted_sals_with_vegas_lines['pHR/PA'] = park_adjusted_sals_with_vegas_lines['pHR/PA'] * park_adjusted_sals_with_vegas_lines['HR'] / 100
+    park_adjusted_sals_with_vegas_lines['pBB/PA'] = park_adjusted_sals_with_vegas_lines['pBB/PA'] * park_adjusted_sals_with_vegas_lines['BB'] / 100
+
+    return park_adjusted_sals_with_vegas_lines
+
+def adjust_for_park_factors_pitchers(sals_with_vegas_lines):
+    park_factors = pd.read_csv('ParkFactors.csv')
+    park_adjusted_sals_with_vegas_lines = sals_with_vegas_lines.merge(park_factors, how = 'left', on = ['Game.StadiumID'])
+    park_adjusted_sals_with_vegas_lines['pK'] = park_adjusted_sals_with_vegas_lines['pK'] * park_adjusted_sals_with_vegas_lines['SO'] / 100
+    park_adjusted_sals_with_vegas_lines['pBB'] = park_adjusted_sals_with_vegas_lines['pBB'] * park_adjusted_sals_with_vegas_lines['BB'] / 100
+    park_adjusted_sals_with_vegas_lines['pHR'] = park_adjusted_sals_with_vegas_lines['pHR'] * park_adjusted_sals_with_vegas_lines['HR'] / 100
+    park_adjusted_sals_with_vegas_lines['pH'] = park_adjusted_sals_with_vegas_lines['pH'] * (park_adjusted_sals_with_vegas_lines['1B'] * 0.65 + park_adjusted_sals_with_vegas_lines['2B'] * 0.2 + park_adjusted_sals_with_vegas_lines['HR'] * 0.15) / 100
+
+    return park_adjusted_sals_with_vegas_lines
+
+# Get current full season stats at a particular date
 def get_current_season_stats(date):
 
     season = date[:4]
@@ -48,6 +75,7 @@ def get_current_season_stats(date):
 
     return df_player_season_stats
 
+# Get full season stats for the prior season
 def get_prior_season_stats(date):
 
     season = str(int(date[:4]) - 1)
@@ -58,15 +86,17 @@ def get_prior_season_stats(date):
 
     return df_player_season_stats
 
+# Get start by start results for pitchers from the prior season
 def get_prior_season_game_logs(date):
 
     season = str(int(date[:4]) - 1)
 
+    # based on current file structure and the order of events in the master_projections formulas
     os.chdir('..')
     cwd = os.getcwd()
     os.chdir(cwd + '/Fantasy.2018-2021')
     game_stats_prior = pd.read_csv(f'PlayerGame.{season}.csv')
-    # Select only regular season data (should only be needed on backtesting)
+    # Select only regular season data (should only be needed on backpark_adjusted_sals_with_vegas_linesing)
     game_stats_prior = game_stats_prior.loc[game_stats_prior.SeasonType == 1].reset_index(drop=True)
     # Select only pitcher data
     game_stats_prior = game_stats_prior.loc[game_stats_prior.PositionCategory == 'P'].reset_index(drop=True)
@@ -74,20 +104,23 @@ def get_prior_season_game_logs(date):
     game_stats_prior = game_stats_prior.loc[game_stats_prior.Started == 1].reset_index(drop=True)
     game_stats_prior['ER/out'] = game_stats_prior.apply(lambda row: row['PitchingEarnedRuns'] / row['TotalOutsPitched'] if row['TotalOutsPitched'] > 0 else 0, axis=1)
 
+    os.chdir('..')
+
     return game_stats_prior
 
+# Self explanatory
 def get_current_season_game_logs_batters(date):
-    ## function only in use for back testing
+    ## function only in use for back park_adjusted_sals_with_vegas_linesing
 
     season = date[:4]
     cwd = os.getcwd()
     os.chdir(cwd + '/Fantasy.2018-2021')
 
-    ## Currently using all past games we have access to for testing
+    ## Currently using all past games we have access to for park_adjusted_sals_with_vegas_linesing
     ## In practice you'd just need the current season data file
     game_stats = pd.read_csv(f'PlayerGame.{season}.csv')
 
-    # Select only regular season data (should only be needed on backtesting)
+    # Select only regular season data (should only be needed on backpark_adjusted_sals_with_vegas_linesing)
     game_stats = game_stats.loc[game_stats.SeasonType == 1].reset_index(drop=True)
 
     # Select only batter data
@@ -99,7 +132,7 @@ def get_current_season_game_logs_batters(date):
     # Just changes name of dataframe
     data = game_stats.sort_values(['PlayerID', 'Day'], ascending=True).reset_index(drop=True)
 
-    # For beta testing only, need to select only games from prior to the request date
+    # For park_adjusted_sals_with_vegas_linesing only, need to select only games from prior to the request date
     data['Day'] = data['Day'].astype('datetime64[ns]')
     data['Day'] = data['Day'].dt.date
     date_object = datetime.strptime(date, '%Y-%b-%d').date()
@@ -111,21 +144,24 @@ def get_current_season_game_logs_batters(date):
 
     return data
 
+# returns a dataframe that is used in the main projections functions
+# to calculate league totals and averages for the current season
+# does not actually calculate leage stats in this function
 def get_league_stats(date):
 
     season = date[:4]
 
-    ## Currently using all past games we have access to for testing
+    ## Currently using all past games we have access to for park_adjusted_sals_with_vegas_linesing
     ## In practice you'd just need the current season data file
     game_stats = pd.read_csv(f'PlayerGame.{season}.csv')
 
-    # Select only regular season data (should only be needed on backtesting)
+    # Select only regular season data (should only be needed on backpark_adjusted_sals_with_vegas_linesing)
     league_stats = game_stats.loc[game_stats.SeasonType == 1].reset_index(drop=True)
 
     # Select only batter data
     league_stats = league_stats.loc[league_stats.PositionCategory != 'P'].reset_index(drop=True)
 
-    # For beta testing only, need to select only games from prior to the request date
+    # For park_adjusted_sals_with_vegas_linesing only, need to select only games from prior to the request date
     league_stats['Day'] = league_stats['Day'].astype('datetime64[ns]')
     league_stats['Day'] = league_stats['Day'].dt.date
     date_object = datetime.strptime(date, '%Y-%b-%d').date()
@@ -134,18 +170,19 @@ def get_league_stats(date):
 
     return league_stats
 
+# self explanatory
 def get_current_season_game_logs_pitchers(date):
-    ## function only in use for back testing
+    ## function only in use for back park_adjusted_sals_with_vegas_linesing
 
     season = date[:4]
     cwd = os.getcwd()
     os.chdir(cwd + '/Fantasy.2018-2021')
 
-    ## Currently using all past games we have access to for testing
+    ## Currently using all past games we have access to for park_adjusted_sals_with_vegas_linesing
     ## In practice you'd just need the current season data file
     game_stats = pd.read_csv(f'PlayerGame.{season}.csv')
 
-    # Select only regular season data (should only be needed on backtesting)
+    # Select only regular season data (should only be needed on backpark_adjusted_sals_with_vegas_linesing)
     game_stats = game_stats.loc[game_stats.SeasonType == 1].reset_index(drop=True)
 
     # Select only pitcher data
@@ -154,7 +191,7 @@ def get_current_season_game_logs_pitchers(date):
     # Just changes name of dataframe
     data = game_stats.sort_values(['PlayerID', 'Day'], ascending=True).reset_index(drop=True)
 
-    # For beta testing only, need to select only games from prior to the request date
+    # For beta park_adjusted_sals_with_vegas_linesing only, need to select only games from prior to the request date
     data['Day'] = data['Day'].astype('datetime64[ns]')
     data['Day'] = data['Day'].dt.date
     date_object = datetime.strptime(date, '%Y-%b-%d').date()
@@ -166,6 +203,8 @@ def get_current_season_game_logs_pitchers(date):
 
     return data
 
+# Calculates position statistical averages
+# Need to specify hitters or pitchers
 def get_average_stats_by_position(date, game_logs, pos_group):
 
     if pos_group == 'hitters':
@@ -230,6 +269,10 @@ def get_average_stats_by_position(date, game_logs, pos_group):
 
         return
 
+# Retrieves already calculated "marcels" projections
+# which are full season projections calculated prior to the 
+# start of the specified season
+# These act as our baseline assumption of talent level for each player 
 def get_marcels_batters(date):
 
     season = date[:4]
@@ -259,8 +302,12 @@ def get_marcels_pitchers(date):
 
     return marcels
 
+# Create dictionary of current season stats for each player
+# As well as a "stabilization factor" that is used to adjust our player baseline based on current season performance
+# Stabilization factors are calculated by combining research on when certain statistics "stabilize"
+# as well as how "reliable" our marcels predictions are
+# Marcels reliability is based on how many plate appearances a player has accumulated over the last 3 seasons
 def create_stabilization_dict_hitters(dataframe, rel_dict):
-    ## Create dictionary of current season total stats and stabilization factors for each player
 
     player_dict = {}
     if dataframe.shape[0] == 0: pass # need to include something for the first day of the season
@@ -284,6 +331,8 @@ def create_stabilization_dict_hitters(dataframe, rel_dict):
         rel = rel_dict[player]
         rel_fact = (2.2 ** rel) / 2
 
+        # These values represent how much influence a players performance in the current season
+        # will have on adjusting our prior estimates of a players per PA talent level
         player_dict[player]['BB_s'] = PA / (PA + (120 * rel_fact))
         player_dict[player]['HBP_s'] = PA / (PA + (240 * rel_fact))
         player_dict[player]['S_s'] = PA / (PA + (290 * rel_fact))
@@ -294,6 +343,7 @@ def create_stabilization_dict_hitters(dataframe, rel_dict):
 
     return player_dict
 
+# Similar to above, but for pitchers
 def create_stabilization_dict_pitchers(sum_data, reliability_dict):
     ## Create dictionary of current season total stats and stabilization factors for each player
     ## Separate out HR from non HR
@@ -329,9 +379,11 @@ def create_stabilization_dict_pitchers(sum_data, reliability_dict):
 
     return player_dict
 
+
 def create_per_pa_marcels_rates_hitters(game_logs_file, marcels_file):
     data_ID = game_logs_file[['PlayerID', 'Name']].drop_duplicates()
-    marcels = marcels_file.merge(data_ID, how='left', on='Name')
+    marcels = marcels_file.drop_duplicates(subset=['Name'], keep='first')
+    marcels = marcels.merge(data_ID, how='left', on='Name')
     marcels = marcels[marcels['PlayerID'].notna()]
     marcels = marcels.set_index('PlayerID')
     rel_columns = marcels.columns.to_list()[12:29]
@@ -432,6 +484,8 @@ def create_blended_projections_hitters(players, marcel_players, player_dict, mar
                 player_proj = player_dict[player]
                 
                 eff_pos = df_player_sal.loc[df_player_sal['PlayerID'] == player, 'EffectivePosition'].iloc[0]
+                if eff_pos == 'DH':
+                    eff_pos = '1B'
                 proj_by_position = average_stats_by_position.loc[eff_pos]
                 proj_by_pos_dict = proj_by_position.to_dict()
                 
@@ -445,7 +499,7 @@ def create_blended_projections_hitters(players, marcel_players, player_dict, mar
                 if PA == 0:
 
                     for stat in stat_list:
-                        new_player_dict[stat] = proj_by_pos_dict[player][stat]
+                        new_player_dict[stat] = proj_by_pos_dict[stat]
 
                     player_projs_dict[player] = new_player_dict
                     continue
@@ -622,7 +676,6 @@ def generate_starting_pitcher_projections(list_of_starters, result_df, prior_yea
     all_starters = {}
 
     for starter in list_of_starters:
-        print(starter)
         try:
             starter_team = result_df.loc[result_df.PlayerID == starter,'TeamID'].reset_index(drop=True)[0]
         except: continue
@@ -634,7 +687,10 @@ def generate_starting_pitcher_projections(list_of_starters, result_df, prior_yea
             opponent_id = home_team
             
         starter_team_w_pct = result_df.loc[result_df.PlayerID == starter,'PlayerTeamVegasWinProb'].reset_index(drop=True)[0]
-            
+        
+        if math.isnan(starter_team_w_pct):
+            starter_team_w_pct = 0.5
+        else: pass
             
         try:    
             mean_vs_team = current_year_starts_vs_team.loc[opponent_id]['mean']
@@ -686,7 +742,7 @@ def generate_starting_pitcher_projections(list_of_starters, result_df, prior_yea
         else:
             if starter in prior_year_ind_pitcher_dist.index:
                 prior_year_pitcher_outs = prior_year_ind_pitcher_dist.loc[starter]['sum']
-                var_of_starter = (((prior_year_ind_pitcher_dist.loc[starter]['std'] ** 2) * prior_year_pitcher_outs) + ((weighted_league_innings_dist_std ** 2) * 100)) / (current_year_pitcher_outs + 100)
+                var_of_starter = (((prior_year_ind_pitcher_dist.loc[starter]['std'] ** 2) * prior_year_pitcher_outs) + ((weighted_league_innings_dist_std ** 2) * 100)) / (prior_year_pitcher_outs + 100)
                 total_outs = prior_year_pitcher_outs
             else:
                 var_of_starter = weighted_league_innings_dist_std ** 2
