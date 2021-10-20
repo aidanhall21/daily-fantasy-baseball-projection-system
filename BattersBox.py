@@ -1,3 +1,5 @@
+#%%
+
 import sys
 import psycopg2
 import datetime
@@ -12,6 +14,7 @@ version = 2
 
 statlineQuery = """
 	select 	hittermlbamid,
+			key_bbref,
 			hittername,
 			pitcherteam_abb,			
 			hitter_home_away,
@@ -30,6 +33,7 @@ statlineQuery = """
 	from 
 	(
 	select	hittermlbamid,
+			key_bbref,
 			hittername,
 			pitcherteam_abb,
 			hitterteam_abb,
@@ -45,10 +49,13 @@ statlineQuery = """
 			num_hbp,
 			num_k,
 			num_runs
-	from pl_leaderboard_v2_daily
+	from pl_leaderboard_v2_daily as a
+	left join chadwick_people as b
+		on a.hittermlbamid = b.key_mlbam
 	where game_played = %s
 	) as f
 	group by 	f.hittermlbamid,
+				f.key_bbref,
 				f.hittername,
 				f.pitcherteam_abb,
 				f.hitterteam_abb,
@@ -88,8 +95,11 @@ stolenBasesAndRunsQuery = """
 				f.hittermlbamid;
 """
 
+
+#%%
 class BattersBoxRecord:
 	HitterMLBID = 0
+	HitterBRefID = 0
 	HitterInsideEdgeID = 0
 	HitterName = ""
 	Location = ""
@@ -114,7 +124,7 @@ class BattersBoxRecord:
 
 def MatchingStolenBaseAndRunRecord(records, hitter):
     return Enumerable(records).first_or_default(lambda x: x[1] == hitter.HitterMLBID)
-
+#%%
 try:
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--date", help="date used for the script. If one is not selected, it uses yesterdays date by default")
@@ -163,22 +173,23 @@ try:
 	for hitter in hitters:
 		record = BattersBoxRecord()
 		record.HitterMLBID = hitter[0]
-		names = hitter[1].split(", ")
+		record.HitterBRefID = hitter[1]
+		names = hitter[2].split(", ")
 		record.HitterName = f'{names[1]} {names[0]}'
-		record.Location = "vs" if hitter[3] == "Away" else "@"
-		record.Opponent = hitter[2]
-		record.PA = hitter[4]
-		record.AB = hitter[5]
-		record.Singles = hitter[6]
-		record.Doubles = hitter[7]
-		record.Triples = hitter[8]
-		record.HomeRuns = hitter[9]
-		record.Walks = hitter[10]
-		record.IntentionalWalks = hitter[11]
-		record.HitByPitch = hitter[12]
-		record.Strikeouts = hitter[13]
-		record.RunsBattedIn = hitter[14]
-		record.Team = hitter[15]
+		record.Location = "vs" if hitter[4] == "Away" else "@"
+		record.Opponent = hitter[3]
+		record.PA = hitter[5]
+		record.AB = hitter[6]
+		record.Singles = hitter[7]
+		record.Doubles = hitter[8]
+		record.Triples = hitter[9]
+		record.HomeRuns = hitter[10]
+		record.Walks = hitter[11]
+		record.IntentionalWalks = hitter[12]
+		record.HitByPitch = hitter[13]
+		record.Strikeouts = hitter[14]
+		record.RunsBattedIn = hitter[15]
+		record.Team = hitter[16]
 
 		record.Hits = record.Singles + record.Doubles + record.Triples + record.HomeRuns
 		record.TotalBases = record.Singles + (record.Doubles * 2) + (record.Triples * 3) + (record.HomeRuns * 4)
@@ -220,8 +231,9 @@ try:
 	sheet1.write(1, 13, 'R', style2)
 	sheet1.write(1, 14, 'RBI', style2)
 	sheet1.write(1, 15, 'SB', style2)
+	sheet1.write(1, 16, 'brefID', style2)
 
-	sheet1.write(1, 17, f'<p>Let\'s see how every other hitter did {scriptDate.strftime("%A")}:</p>')
+	#sheet1.write(1, 17, f'<p>Let\'s see how every other hitter did {scriptDate.strftime("%A")}:</p>')
 
 	index = 2
 	for player in Enumerable(BattersBoxRecords).order_by_descending(lambda x: x.TotalBases + x.StolenBases + x.Runs + x.RunsBattedIn - x.Strikeouts).to_list():
@@ -269,8 +281,9 @@ try:
 		sheet1.write(index, 13, player.Runs)
 		sheet1.write(index, 14, player.RunsBattedIn) 
 		sheet1.write(index, 15, player.StolenBases)
+		sheet1.write(index, 16, player.HitterBRefID)
 
-		sheet1.write(index, 17, f'<div class="hitter-blurb" data-player-id="{player.HitterMLBID}"><strong><span class="hitter-name">{player.HitterName}</span><span> (POS, {player.Team})</span><span> - </span><span class="hitter-stats">{statline}</span><span> - </span></strong> BLURB </div>')
+		#sheet1.write(index, 17, f'<div class="hitter-blurb" data-player-id="{player.HitterMLBID}"><strong><span class="hitter-name">{player.HitterName}</span><span> (POS, {player.Team})</span><span> - </span><span class="hitter-stats">{statline}</span><span> - </span></strong> BLURB </div>')
 		index += 1
   
 	wb.save(f'BattersBox{scriptDate}.xls') 
