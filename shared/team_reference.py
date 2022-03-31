@@ -1,0 +1,180 @@
+reference = [
+    {
+        'team': 'twins',
+        'abbr': 'MIN',
+        'lg': 'AL',
+        'park_id': 14,
+    },
+
+]
+
+reference_test = [
+    {
+        'team': 'orioles',
+        'abbr': 'BAL',
+        'lg': 'AL',
+        'park_id': 22,
+    },
+    {
+        'team': 'red-sox',
+        'abbr': 'BOS',
+        'lg': 'AL',
+        'park_id': 50,
+    },
+    {
+        'team': 'white-sox',
+        'abbr': 'CHW',
+        'lg': 'AL',
+        'park_id': 25,
+    },
+    {
+        'team': 'guardians',
+        'abbr': 'CLE',
+        'lg': 'AL',
+        'park_id': 10,
+    },
+    {
+        'team': 'tigers',
+        'abbr': 'DET',
+        'lg': 'AL',
+        'park_id': 62,
+    },
+        {
+        'team': 'astros',
+        'abbr': 'HOU',
+        'lg': 'AL',
+        'park_id': 63,
+    },
+    {
+        'team': 'royals',
+        'abbr': 'KCR',
+        'lg': 'AL',
+        'park_id': 33,
+    },
+    {
+        'team': 'angels',
+        'abbr': 'LAA',
+        'lg': 'AL',
+        'park_id': 28,
+    },
+    {
+        'team': 'yankees',
+        'abbr': 'NYY',
+        'lg': 'AL',
+        'park_id': 35,
+    },
+    {
+        'team': 'athletics',
+        'abbr': 'OAK',
+        'lg': 'AL',
+        'park_id': 23,
+    },
+    {
+        'team': 'mariners',
+        'abbr': 'SEA',
+        'lg': 'AL',
+        'park_id': 65,
+    },
+    {
+        'team': 'rays',
+        'abbr': 'TBR',
+        'lg': 'AL',
+        'park_id': 18,
+    },
+    {
+        'team': 'rangers',
+        'abbr': 'TEX',
+        'lg': 'AL',
+        'park_id': 21,
+    },
+        {
+        'team': 'blue-jays',
+        'abbr': 'TOR',
+        'lg': 'AL',
+        'park_id': 42,
+    },
+    {
+        'team': 'diamondbacks',
+        'abbr': 'ARI',
+        'lg': 'NL',
+        'park_id': 54,
+    },
+    {
+        'team': 'cubs',
+        'abbr': 'CHC',
+        'lg': 'NL',
+        'park_id': 27,
+    },
+    {
+        'team': 'reds',
+        'abbr': 'CIN',
+        'lg': 'NL',
+        'park_id': 64,
+    },
+    {
+        'team': 'rockies',
+        'abbr': 'COL',
+        'lg': 'NL',
+        'park_id': 44,
+    },
+    {
+        'team': 'dodgers',
+        'abbr': 'LAD',
+        'lg': 'NL',
+        'park_id': 31,
+    },
+    {
+        'team': 'marlins',
+        'abbr': 'MIA',
+        'lg': 'NL',
+        'park_id': 57,
+    },
+    {
+        'team': 'brewers',
+        'abbr': 'MIL',
+        'lg': 'NL',
+        'park_id': 19,
+    },
+    {
+        'team': 'mets',
+        'abbr': 'NYM',
+        'lg': 'NL',
+        'park_id': 8,
+    },
+    {
+        'team': 'phillies',
+        'abbr': 'PHI',
+        'lg': 'NL',
+        'park_id': 51,
+    },
+    {
+        'team': 'pirates',
+        'abbr': 'PIT',
+        'lg': 'NL',
+        'park_id': 29,
+    },
+    {
+        'team': 'padres',
+        'abbr': 'SDP',
+        'lg': 'NL',
+        'park_id': 1,
+    },
+    {
+        'team': 'giants',
+        'abbr': 'SFG',
+        'lg': 'NL',
+        'park_id': 13,
+    },
+    {
+        'team': 'cardinals',
+        'abbr': 'STL',
+        'lg': 'NL',
+        'park_id': 41,
+    },
+    {
+        'team': 'nationals',
+        'abbr': 'WSN',
+        'lg': 'NL',
+        'park_id': 53,
+    },
+]
