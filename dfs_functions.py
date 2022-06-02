@@ -19,6 +19,17 @@ def get_batter_salaries(date):
 
     return df_player_sal, players
 
+# Get full season stats for the prior season
+def get_prior_season_stats(date):
+
+    season = str(int(date[:4]) - 1)
+    response = requests.get(f'https://api.sportsdata.io/api/mlb/fantasy/json/PlayerSeasonStats/{season}', headers={'Ocp-Apim-Subscription-Key': '6fcab751d8594ce9909283dcdc522d24'})
+
+    stats = response.json()
+    df_player_season_stats = pd.json_normalize(stats)
+
+    return df_player_season_stats
+
 def get_current_season_game_logs_batters(date):
     
     season = date[:4]
@@ -534,7 +545,7 @@ def get_marcels_pitchers(date):
 def create_stabilization_dict_pitchers(sum_data, reliability_dict):
     ## Create dictionary of current season total stats and stabilization factors for each player
     ## Separate out HR from non HR
-
+    player_id_list = []
     player_dict = {}
     if sum_data.shape[0] == 0: pass # need to include something for the first day of the season
     else:

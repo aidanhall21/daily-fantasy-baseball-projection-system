@@ -3,6 +3,10 @@ import numpy as np
 import math
 from datetime import date
 import json
+from pybaseball import playerid_lookup
+pd.set_option('display.max_rows', None)
+import unidecode
+
 
 from dfs_functions import *
 
@@ -35,8 +39,8 @@ sum_data = game_logs[['PlayerID', 'PA', 'S', 'D', 'T', 'HR', 'BB', 'HP', 'SB', '
 reliability_dict = {}
 
 df_p = marcels_p[['Name', 'Reliability']]
-game_logs_p = game_logs_p.merge(df, how='left', on='Name')
-game_logs_p = game_logs_p.loc[game_logs['PlayerID'].isin(players)]
+game_logs_p = game_logs_p.merge(df_p, how='left', on='Name')
+game_logs_p = game_logs_p.loc[game_logs_p['PlayerID'].isin(players_p)]
 sum_data_p = game_logs_p[['PlayerID', 'Started', 'Games', 'W', 'TotalOutsPitched', 'ER', 'BB', 'SO', 'H', 'HR', 'H-HR']].reset_index(drop=True).groupby(['PlayerID']).sum()
 
 reliability_dict_p = {}
@@ -152,6 +156,20 @@ or_stats = ['HR', 'BB', 'HBP', 'SO', 'H']
 lg_a_or_dict = {}
 for i in range(len(or_stats)):
     lg_a_or_dict[or_stats[i]] = lg_p[i + 4] / (1 - lg_p[i + 4])
+
+team_totals = {}
+OR_pitchers = {}
+pitcher_index = {}
+
+for r in t.index:
+    row = t.loc[r,:].tolist()
+    op = row[16]
+    pid = row[14]
+    team = row[15]
+    ip = row[17]
+    if op in pitcher_index: pass
+    else:
+        pitcher_index[op] = [pid, team, ip]
 
 # OR for pitchers
 for r in t.index:
@@ -281,9 +299,69 @@ pitchers_final_df['FanDuelPoints'] = pitchers_final_df.apply(lambda row: round(r
 pfd = pitchers_final_df.rename(columns={"pW": "W", "pQS": "QS"})
 pfd = pfd[['PlayerID', 'TeamID', 'SlateID', 'Operator', 'OperatorPlayerID', 'OperatorSalary', 'Name', 'OperatorRosterSlots', 'IP', 'TBF', 'W', 'QS', 'H', 'ER', 'HR', 'K', 'BB', 'HBP', 'DraftKingsPoints', 'FanDuelPoints']]
 
+pid_map = pd.read_csv('player_id_map.csv')
+pid_map = pid_map[['mlbname', 'mlbid']].dropna()
+pid_map2 = pd.read_csv('names_id_df.csv')
+comb_ids = pd.concat([pid_map, pid_map2]).reset_index(drop=True)
+
+bfd['Name_u'] = bfd.apply(lambda r: unidecode.unidecode(r['Name']), axis=1)
+pfd['Name_u'] = pfd.apply(lambda r: unidecode.unidecode(r['Name']), axis=1)
+
+pfd = pfd.merge(comb_ids, how='left', left_on='Name_u', right_on='mlbname')
+bfd = bfd.merge(comb_ids, how='left', left_on='Name_u', right_on='mlbname')
+
+
+names_to_lookup = []
+
+for i in range(len(pfd.index)):
+    r = pfd.loc[i, ['Name', 'mlbid']].tolist()
+    name = unidecode.unidecode(r[0])
+    if np.isnan(r[1]) and name not in names_to_lookup: names_to_lookup.append(name) 
+    else: continue
+        
+for i in range(len(bfd.index)):
+    r = bfd.loc[i, ['Name', 'mlbid']].tolist()
+    name = unidecode.unidecode(r[0])
+    if np.isnan(r[1]) and name not in names_to_lookup: names_to_lookup.append(name) 
+    else: continue
+        
+additional_names = []
+
+for n in names_to_lookup:
+    ns = n.split(' ')
+    try:
+        data = playerid_lookup(ns[1], ns[0])
+        pid = data['key_mlbam'][0]
+    except: continue
+    additional_names.append([n, pid])
+    
+additional_names_df = pd.DataFrame(additional_names, columns = ['mlbname', 'mlbid'])
+comb_df = pd.concat([pid_map2, additional_names_df]).reset_index(drop=True)
+comb_df.to_csv('names_id_df.csv', index=False)
+
+pfd = pfd.merge(additional_names_df, how='left', left_on='Name_u', right_on='mlbname')
+bfd = bfd.merge(additional_names_df, how='left', left_on='Name_u', right_on='mlbname')
+
+bfd['pid'] = bfd['mlbid_x'].combine_first(bfd['mlbid_y'])
+pfd['pid'] = pfd['mlbid_x'].combine_first(pfd['mlbid_y'])
+
+bfd = bfd.drop(['Name_u', 'mlbname_x', 'mlbid_x', 'mlbname_y', 'mlbid_y'], axis=1)
+bfd = bfd.rename(columns={"PlayerID": "SportsDataIO_ID", "pid": "PlayerID"})
+
+first_column = bfd.pop('PlayerID')
+bfd.insert(0, 'PlayerID', first_column)
+
+pfd = pfd.drop(['Name_u', 'mlbname_x', 'mlbid_x', 'mlbname_y', 'mlbid_y'], axis=1)
+pfd = pfd.rename(columns={"PlayerID": "SportsDataIO_ID", "pid": "PlayerID"})
+
+first_column = pfd.pop('PlayerID')
+pfd.insert(0, 'PlayerID', first_column)
 
 p_out = pfd.to_json(orient='index')
 b_out = bfd.to_json(orient='index')
 
 p_object = json.loads(p_out)
 b_object = json.loads(b_out)
+
+pfd.to_csv('pitchers_test.csv', index=False)
+bfd.to_csv('batters_test.csv', index=False)
