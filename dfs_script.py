@@ -1,3 +1,6 @@
+### RUN python dfs_get_data.py FIRST
+
+
 import pandas as pd
 import numpy as np
 import math
@@ -5,6 +8,7 @@ from datetime import date
 import json
 from pybaseball import playerid_lookup
 pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
 import unidecode
 
 
@@ -268,8 +272,9 @@ g.columns = t.columns.tolist() + ['nK', 'nHR', 'nH', 'nBB', 'nHBP']
 g = g[['PlayerID_x', 'TeamID_x', 'OperatorPlayerName_x', 'nK', 'nHR', 'nH', 'nBB', 'nHBP']]
 g = g.rename(columns={"PlayerID_x": "PlayerID", "TeamID_x": "TeamID", 'OperatorPlayerName_x': 'Name', 'nK': 'K', 'nHR': 'HR', 'nH': 'H', 'nBB': 'BB', 'nHBP': 'HBP'})
 
-b_info = projection_df[['PlayerID', 'SlateID', 'Operator', 'OperatorPlayerID', 'OperatorSalary', 'OperatorRosterSlots', 'pPA', 'pR', 'pS', 'pD', 'pT', 'pRBI', 'pSB']]
+b_info = projection_df[['PlayerID', 'SlateID', 'Operator', 'OperatorPlayerID', 'OperatorSalary', 'OperatorGameType', 'OperatorRosterSlots', 'pPA', 'pR', 'pS', 'pD', 'pT', 'pRBI', 'pSB']]
 b_info = b_info.rename(columns={"pPA": "PA", "pR": "R", 'pRBI': 'RBI', 'pSB': 'SB'})
+b_info = b_info[b_info['OperatorGameType'] == 'Classic'].reset_index(drop=True)
 
 batters_final_df = g.merge(b_info, how='left', on='PlayerID')
 
@@ -279,7 +284,7 @@ batters_final_df['3B'] = batters_final_df.apply(lambda row: (row['pT'] / (row['p
 batters_final_df['DraftKingsPoints'] = batters_final_df.apply(lambda row: round((3 * row['1B']) + (5 * row['2B']) + (8 * row['3B']) + (10 * row['HR']) + (2 * row['RBI']) + (2 * row['R']) + (2 * row['BB']) + (2 * row['HBP']) + (5 * row['SB']), 2), axis=1)
 batters_final_df['FanDuelPoints'] = batters_final_df.apply(lambda row: round((3 * row['1B']) + (6 * row['2B']) + (9 * row['3B']) + (12 * row['HR']) + (3.5 * row['RBI']) + (3.2 * row['R']) + (3 * row['BB']) + (3 * row['HBP']) + (6 * row['SB']), 2), axis=1)
 
-bfd = batters_final_df[['PlayerID', 'TeamID', 'SlateID', 'Operator', 'OperatorPlayerID', 'OperatorSalary', 'Name', 'OperatorRosterSlots', 'PA', 'H', 'R', '1B', '2B', '3B', 'HR', 'RBI', 'K', 'BB', 'HBP', 'SB', 'DraftKingsPoints', 'FanDuelPoints']]
+bfd = batters_final_df[['PlayerID', 'TeamID', 'SlateID', 'Operator', 'OperatorPlayerID', 'OperatorSalary', 'OperatorGameType', 'Name', 'OperatorRosterSlots', 'PA', 'H', 'R', '1B', '2B', '3B', 'HR', 'RBI', 'K', 'BB', 'HBP', 'SB', 'DraftKingsPoints', 'FanDuelPoints']]
 
 for key in pitcher_index:
     adj_p_dict[key] += pitcher_index[key]
@@ -288,7 +293,8 @@ v = pd.DataFrame.from_dict(adj_p_dict, orient='index')
 v = v.reset_index()
 v.columns = ['Name', 'K', 'HR', 'H', 'BB', 'HBP', 'PlayerID', 'TeamID', 'IP']
 
-p_info = projection_df_p[['PlayerID', 'SlateID', 'Operator', 'OperatorPlayerID', 'OperatorSalary', 'OperatorRosterSlots', 'pW', 'pQS']]
+p_info = projection_df_p[['PlayerID', 'SlateID', 'Operator', 'OperatorPlayerID', 'OperatorSalary', 'OperatorGameType', 'OperatorRosterSlots', 'pW', 'pQS']]
+p_info = p_info[p_info['OperatorGameType'] == 'Classic'].reset_index(drop=True)
 pitchers_final_df = v.merge(p_info, how='left', on='PlayerID')
 
 pitchers_final_df['ER'] = pitchers_final_df.apply(lambda row: round(((((13 * row['HR']) + (3 * (row['BB'] + row['HBP'])) - (2 * row['K'])) / row['IP']) + FIP_constant) * (row['IP'] / 9), 2), axis=1)
@@ -297,7 +303,14 @@ pitchers_final_df['DraftKingsPoints'] = pitchers_final_df.apply(lambda row: roun
 pitchers_final_df['FanDuelPoints'] = pitchers_final_df.apply(lambda row: round(row['pW'] * 6 + row['pQS'] * 4 + row['ER'] * -3 + row['K'] * 3 + row['IP'] * 3, 2), axis=1)
 
 pfd = pitchers_final_df.rename(columns={"pW": "W", "pQS": "QS"})
-pfd = pfd[['PlayerID', 'TeamID', 'SlateID', 'Operator', 'OperatorPlayerID', 'OperatorSalary', 'Name', 'OperatorRosterSlots', 'IP', 'TBF', 'W', 'QS', 'H', 'ER', 'HR', 'K', 'BB', 'HBP', 'DraftKingsPoints', 'FanDuelPoints']]
+pfd = pfd[['PlayerID', 'TeamID', 'SlateID', 'Operator', 'OperatorPlayerID', 'OperatorSalary', 'OperatorGameType', 'Name', 'OperatorRosterSlots', 'IP', 'TBF', 'W', 'QS', 'H', 'ER', 'HR', 'K', 'BB', 'HBP', 'DraftKingsPoints', 'FanDuelPoints']]
+
+pfd['DK$'] = pfd.apply(lambda r: round(r['DraftKingsPoints'] / (r['OperatorSalary'] / 1000), 2) , axis=1)
+pfd['FD$'] = pfd.apply(lambda r: round(r['FanDuelPoints'] / (r['OperatorSalary'] / 1000), 2) , axis=1)
+
+bfd['TB'] = bfd.apply(lambda r: round(r['1B'] + 2 * r['2B'] + 3 * r['3B'] + 4 * r['HR'], 2), axis=1)
+bfd['DK$'] = bfd.apply(lambda r: round(r['DraftKingsPoints'] / (r['OperatorSalary'] / 1000), 2) , axis=1)
+bfd['FD$'] = bfd.apply(lambda r: round(r['FanDuelPoints'] / (r['OperatorSalary'] / 1000), 2) , axis=1)
 
 pid_map = pd.read_csv('player_id_map.csv')
 pid_map = pid_map[['mlbname', 'mlbid']].dropna()
@@ -365,3 +378,6 @@ b_object = json.loads(b_out)
 
 pfd.to_csv('pitchers_test.csv', index=False)
 bfd.to_csv('batters_test.csv', index=False)
+
+
+
