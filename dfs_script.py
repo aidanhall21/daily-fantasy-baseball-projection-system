@@ -1,5 +1,4 @@
-### RUN python dfs_get_data.py FIRST
-
+### MUST RUN python dfs_get_data.py PRIOR TO THE FIRST RUN OF THE DAY
 
 import pandas as pd
 import numpy as np
@@ -369,6 +368,55 @@ pfd = pfd.rename(columns={"PlayerID": "SportsDataIO_ID", "pid": "PlayerID"})
 
 first_column = pfd.pop('PlayerID')
 pfd.insert(0, 'PlayerID', first_column)
+
+dk_sal = {}
+fd_sal = {}
+
+for i in range(len(pfd.index)):
+    r = pfd.loc[i, :].tolist()
+    
+    op = r[4]
+    op_sal = r[6]
+    p = r[8]
+    
+    if op == 'DraftKings':
+        if p in dk_sal: pass
+        else: dk_sal[p] = op_sal
+    elif op == 'FanDuel':
+        if p in fd_sal: pass
+        else: fd_sal[p] = op_sal
+    else: continue
+        
+for i in range(len(bfd.index)):
+    r = bfd.loc[i, :].tolist()
+    
+    op = r[4]
+    op_sal = r[6]
+    p = r[8]
+    
+    if op == 'DraftKings':
+        if p in dk_sal: pass
+        else: dk_sal[p] = op_sal
+    elif op == 'FanDuel':
+        if p in fd_sal: pass
+        else: fd_sal[p] = op_sal
+    else: continue
+        
+bfd['DraftKingsSalary'] = bfd.apply(lambda r: dk_sal[r['Name']] if r['Name'] in dk_sal else 0, axis=1)
+bfd['FanDuelSalary'] = bfd.apply(lambda r: fd_sal[r['Name']] if r['Name'] in fd_sal else 0, axis=1)
+
+pfd['DraftKingsSalary'] = pfd.apply(lambda r: dk_sal[r['Name']] if r['Name'] in dk_sal else 0, axis=1)
+pfd['FanDuelSalary'] = pfd.apply(lambda r: fd_sal[r['Name']] if r['Name'] in fd_sal else 0, axis=1)
+
+bfd = bfd.drop_duplicates(subset=["Name"], keep='first')
+bfd = bfd.dropna(subset=['PlayerID']).reset_index(drop=True)
+
+pfd = pfd.drop_duplicates(subset=["Name"], keep='first')
+pfd = pfd.dropna(subset=['PlayerID']).reset_index(drop=True)
+
+
+bfd = bfd.drop(['SlateID', 'Operator', 'OperatorPlayerID', 'OperatorSalary', 'OperatorGameType'], axis=1)
+pfd = pfd.drop(['SlateID', 'Operator', 'OperatorPlayerID', 'OperatorSalary', 'OperatorGameType'], axis=1)
 
 p_out = pfd.to_json(orient='index')
 b_out = bfd.to_json(orient='index')
