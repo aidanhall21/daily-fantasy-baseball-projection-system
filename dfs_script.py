@@ -306,10 +306,12 @@ pfd = pfd[['PlayerID', 'TeamID', 'SlateID', 'Operator', 'OperatorPlayerID', 'Ope
 
 pfd['DK$'] = pfd.apply(lambda r: round(r['DraftKingsPoints'] / (r['OperatorSalary'] / 1000), 2) , axis=1)
 pfd['FD$'] = pfd.apply(lambda r: round(r['FanDuelPoints'] / (r['OperatorSalary'] / 1000), 2) , axis=1)
+pfd['PLBot'] = pfd.apply(lambda r: round((r['DraftKingsPoints'] + r['FanDuelPoints']) / 2, 2), axis=1)
 
 bfd['TB'] = bfd.apply(lambda r: round(r['1B'] + 2 * r['2B'] + 3 * r['3B'] + 4 * r['HR'], 2), axis=1)
 bfd['DK$'] = bfd.apply(lambda r: round(r['DraftKingsPoints'] / (r['OperatorSalary'] / 1000), 2) , axis=1)
 bfd['FD$'] = bfd.apply(lambda r: round(r['FanDuelPoints'] / (r['OperatorSalary'] / 1000), 2) , axis=1)
+bfd['PLBot'] = bfd.apply(lambda r: round((r['DraftKingsPoints'] + r['FanDuelPoints']) / 2, 2), axis=1)
 
 pid_map = pd.read_csv('player_id_map.csv')
 pid_map = pid_map[['mlbname', 'mlbid']].dropna()
