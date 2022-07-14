@@ -306,12 +306,10 @@ pfd = pfd[['PlayerID', 'TeamID', 'SlateID', 'Operator', 'OperatorPlayerID', 'Ope
 
 pfd['DK$'] = pfd.apply(lambda r: round(r['DraftKingsPoints'] / (r['OperatorSalary'] / 1000), 2) , axis=1)
 pfd['FD$'] = pfd.apply(lambda r: round(r['FanDuelPoints'] / (r['OperatorSalary'] / 1000), 2) , axis=1)
-pfd['PLBot'] = pfd.apply(lambda r: round((r['DraftKingsPoints'] + r['FanDuelPoints']) / 2, 2), axis=1)
 
 bfd['TB'] = bfd.apply(lambda r: round(r['1B'] + 2 * r['2B'] + 3 * r['3B'] + 4 * r['HR'], 2), axis=1)
 bfd['DK$'] = bfd.apply(lambda r: round(r['DraftKingsPoints'] / (r['OperatorSalary'] / 1000), 2) , axis=1)
 bfd['FD$'] = bfd.apply(lambda r: round(r['FanDuelPoints'] / (r['OperatorSalary'] / 1000), 2) , axis=1)
-bfd['PLBot'] = bfd.apply(lambda r: round((r['DraftKingsPoints'] + r['FanDuelPoints']) / 2, 2), axis=1)
 
 pid_map = pd.read_csv('player_id_map.csv')
 pid_map = pid_map[['mlbname', 'mlbid']].dropna()
@@ -416,9 +414,55 @@ bfd = bfd.dropna(subset=['PlayerID']).reset_index(drop=True)
 pfd = pfd.drop_duplicates(subset=["Name"], keep='first')
 pfd = pfd.dropna(subset=['PlayerID']).reset_index(drop=True)
 
-
 bfd = bfd.drop(['SlateID', 'Operator', 'OperatorPlayerID', 'OperatorSalary', 'OperatorGameType'], axis=1)
 pfd = pfd.drop(['SlateID', 'Operator', 'OperatorPlayerID', 'OperatorSalary', 'OperatorGameType'], axis=1)
+
+bfd = bfd[bfd.DraftKingsPoints.notnull()].reset_index(drop=True)
+pfd = pfd[bfd.DraftKingsPoints.notnull()].reset_index(drop=True)
+
+agg_stats_bat = bfd['DraftKingsPoints']
+agg_stats_pitch = pfd['DraftKingsPoints']
+
+analysis_bat = agg_stats_bat.describe()
+analysis_pitch = agg_stats_pitch.describe()
+
+bfd['mV'] = bfd.apply(lambda x: (x['DraftKingsPoints'] - analysis_bat['mean']) / (analysis_bat['std']), axis=1)
+pfd['mV'] = pfd.apply(lambda x: (x['DraftKingsPoints'] - analysis_pitch['mean']) / (analysis_pitch['std']), axis=1)
+
+bfd['selected_pos'] = bfd.apply(lambda x: x['OperatorRosterSlots'][0], axis=1)
+pfd['selected_pos'] = pfd.apply(lambda x: x['OperatorRosterSlots'][0], axis=1)
+
+selected_positions_bat = list(set(bfd['selected_pos'].to_list()))
+selected_positions_pitch = list(set(pfd['selected_pos'].to_list()))
+
+positional_adjustment = {}
+for pos in selected_positions_bat:
+    adj = min(bfd[bfd['selected_pos'] == pos]['mV'])
+    positional_adjustment[pos] = -adj
+
+for pos in selected_positions_pitch:
+    adj = min(pfd[pfd['selected_pos'] == pos]['mV'])
+    positional_adjustment[pos] = -adj
+
+bfd.loc[:, 'mPos'] = bfd.apply(lambda x: positional_adjustment[x.selected_pos], axis=1)
+pfd.loc[:, 'mPos'] = pfd.apply(lambda x: positional_adjustment[x.selected_pos], axis=1)
+
+bfd.loc[:, 'm$'] = bfd.apply(lambda x: x.mV + x.mPos, axis=1)
+pfd.loc[:, 'm$'] = pfd.apply(lambda x: x.mV + x.mPos, axis=1)
+
+total_value_hitters = sum(bfd['m$'])
+dollars_spent_hitters = (50000 * 1 * 0.7)
+dollars_per_value_hitters = dollars_spent_hitters / total_value_hitters
+
+total_value_pitchers = sum(pfd['m$'])
+dollars_spent_pitchers = (50000 * 1 * 0.3)
+dollars_per_value_pitchers = dollars_spent_pitchers / total_value_pitchers
+
+bfd.loc[:, 'PLBot'] = bfd.apply(lambda x: round((x['m$'] * dollars_per_value_hitters), 1), axis=1)
+pfd.loc[:, 'PLBot'] = pfd.apply(lambda x: round((x['m$'] * dollars_per_value_pitchers), 1), axis=1)
+
+bfd = bfd.drop(['mV', 'selected_pos', 'mPos', 'm$'], axis=1)
+pfd = pfd.drop(['mV', 'selected_pos', 'mPos', 'm$'], axis=1)
 
 p_out = pfd.to_json(orient='index')
 b_out = bfd.to_json(orient='index')
